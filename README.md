@@ -153,4 +153,114 @@ The scraper can be configured through environment variables or programmatically:
 
 ---
 
+## Walkthrough
+
+This section provides a step-by-step guide to get you up and running with the Advanced Web Scraper.
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/Scrape_U.git
+cd Scrape_U
+
+# Create virtual environment (recommended)
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+venv\Scripts\activate     # Windows
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Install browser for JavaScript-rendered sites
+playwright install chromium
+```
+
+### Basic Usage
+
+#### Single URL Scraping
+
+```bash
+# Scrape a single URL
+python main.py --url https://example.com
+
+# Scrape with specific export format
+python main.py --url https://quotes.toscrape.com --format csv
+```
+
+#### Multiple URLs
+
+```bash
+# Create a file with URLs (one per line)
+echo "https://example.com" > urls.txt
+echo "https://quotes.toscrape.com" >> urls.txt
+
+# Scrape from file
+python main.py --file urls.txt
+
+# Scrape with multiple workers for parallel processing
+python main.py --file urls.txt --workers 5
+```
+
+### CLI Options
+
+| Option       | Description                          | Default   |
+| ------------ | ------------------------------------ | --------- |
+| `--url`      | Single URL to scrape                 | -         |
+| `--file`     | File containing URLs (one per line)  | -         |
+| `--format`   | Export format (json, csv, sqlite)    | json      |
+| `--workers`  | Number of concurrent workers         | 3         |
+| `--output`   | Output directory for exports         | ./storage |
+| `--strict`   | Enable strict rate limiting (10-30s) | False     |
+| `--no-cache` | Disable HTML caching                 | False     |
+
+### Export Examples
+
+```bash
+# Export to JSON (default)
+python main.py --url https://example.com --format json
+
+# Export to CSV (one product per row)
+python main.py --url https://quotes.toscrape.com --format csv
+
+# Export to SQLite database
+python main.py --url https://example.com --format sqlite
+```
+
+### Data Flow Example
+
+1. **Input URL**: `https://quotes.toscrape.com`
+2. **Robots Check**: Fetches `/robots.txt`, validates path is allowed
+3. **Rate Limit**: Waits 2-5 seconds (politeness delay)
+4. **Stealth**: Applies random User-Agent and optional proxy
+5. **Fetch**: Detects static site → uses HTTP fetcher
+6. **Store**: Saves raw HTML to `storage/raw/`
+7. **Extract**: Parses quotes, authors, and tags
+8. **Export**: Outputs to `storage/exports/quotes.csv`
+
+### Tips for Effective Scraping
+
+| Tip                        | Why                                     |
+| -------------------------- | --------------------------------------- |
+| Start with `--strict` mode | Reduces ban risk on sensitive sites     |
+| Use `--workers 1` first    | Test before scaling up                  |
+| Check `storage/raw/`       | Raw HTML is cached for re-processing    |
+| Monitor console output     | Watch for 403/429 warnings              |
+| Use proxies for scale      | Configure in environment or `config.py` |
+
+### Running Tests
+
+```bash
+# Run all tests
+pytest
+
+# Run with verbose output
+pytest -v
+
+# Run specific test module
+pytest tests/test_safety.py
+```
+
+---
+
 ![alt text](https://media.giphy.com/media/v1.Y2lkPWVjZjA1ZTQ3eWN2YnZrNjNzN29ybmU3dDloNmdrNDBjZ3U0eml0Y3g0M2JzaGQ1MiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/gQJyPqc6E4xoc/giphy.gif)
