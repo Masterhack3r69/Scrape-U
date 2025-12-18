@@ -1,4 +1,4 @@
-# I Web Scraper U
+# I Scrape U
 
 An ethical web scraping system built with Python. This system follows the **"Stealth over Speed"** and **"Politeness First"** principles to ensure sustainable, long-term scraping without getting blocked or overwhelming target servers.
 
