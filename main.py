@@ -34,7 +34,7 @@ def setup_logging(level: str = "INFO") -> None:
 
 def default_parser(url: str, html: str) -> Dict[str, Any]:
     """
-    Default HTML parser that extracts basic page info.
+    Default HTML parser that extracts basic page info and product listings.
     
     Override this with your own parser for specific sites.
     """
@@ -75,7 +75,13 @@ def default_parser(url: str, html: str) -> Dict[str, Any]:
             tag.decompose()
         main_text = main.get_text(separator=" ", strip=True)[:5000]
     
-    return {
+    # Extract product listings (e-commerce pattern)
+    products = extract_products(soup)
+    
+    # Extract quotes (quotes.toscrape.com pattern)
+    quotes = extract_quotes(soup)
+    
+    result = {
         "title": title,
         "description": description,
         "h1": h1,
@@ -83,6 +89,161 @@ def default_parser(url: str, html: str) -> Dict[str, Any]:
         "text_length": len(main_text),
         "text_preview": main_text[:500] if main_text else "",
     }
+    
+    # Add products if found
+    if products:
+        result["products"] = products
+        result["products_count"] = len(products)
+    
+    # Add quotes if found
+    if quotes:
+        result["quotes"] = quotes
+        result["quotes_count"] = len(quotes)
+    
+    return result
+
+
+def extract_quotes(soup: BeautifulSoup) -> list:
+    """
+    Extract quotes from quote listing pages (like quotes.toscrape.com).
+    
+    Looks for div.quote pattern with:
+    - span.text for quote text
+    - small.author for author name
+    - a.tag for tags
+    """
+    quotes = []
+    
+    # Find all quote containers
+    quote_divs = soup.find_all("div", class_="quote")
+    
+    for quote_div in quote_divs:
+        quote = {}
+        
+        # Extract quote text
+        text_tag = quote_div.find("span", class_="text")
+        if text_tag:
+            # Remove curly quotes and clean up
+            quote["text"] = text_tag.get_text(strip=True)
+        
+        # Extract author
+        author_tag = quote_div.find("small", class_="author")
+        if author_tag:
+            quote["author"] = author_tag.get_text(strip=True)
+        
+        # Extract author URL
+        author_link = quote_div.find("a", href=lambda x: x and "/author/" in x)
+        if author_link:
+            quote["author_url"] = author_link.get("href", "")
+        
+        # Extract tags
+        tags = []
+        tags_div = quote_div.find("div", class_="tags")
+        if tags_div:
+            for tag_link in tags_div.find_all("a", class_="tag"):
+                tags.append(tag_link.get_text(strip=True))
+        if tags:
+            quote["tags"] = tags
+        
+        if quote.get("text"):
+            quotes.append(quote)
+    
+    return quotes
+
+
+def extract_products(soup: BeautifulSoup) -> list:
+    """
+    Extract product listings from common e-commerce HTML patterns.
+    
+    Supports multiple common patterns:
+    - article.product_pod (books.toscrape.com)
+    - .product-item, .product-card
+    - Generic product containers
+    """
+    products = []
+    
+    # Pattern 1: books.toscrape.com style (article.product_pod)
+    product_pods = soup.find_all("article", class_="product_pod")
+    if product_pods:
+        for pod in product_pods:
+            product = {}
+            
+            # Extract product name from h3 > a title attribute or text
+            h3 = pod.find("h3")
+            if h3:
+                a_tag = h3.find("a")
+                if a_tag:
+                    product["name"] = a_tag.get("title", "") or a_tag.get_text(strip=True)
+                    product["url"] = a_tag.get("href", "")
+            
+            # Extract price
+            price_tag = pod.find("p", class_="price_color")
+            if price_tag:
+                product["price"] = price_tag.get_text(strip=True)
+            
+            # Extract rating from star-rating class
+            rating_tag = pod.find("p", class_=lambda x: x and "star-rating" in x)
+            if rating_tag:
+                rating_classes = rating_tag.get("class", [])
+                for cls in rating_classes:
+                    if cls != "star-rating":
+                        # Convert word to number
+                        rating_map = {"One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5}
+                        product["rating"] = rating_map.get(cls, cls)
+                        break
+            
+            # Extract availability
+            avail_tag = pod.find("p", class_="instock")
+            if avail_tag:
+                product["availability"] = avail_tag.get_text(strip=True)
+            
+            # Extract image
+            img_tag = pod.find("img")
+            if img_tag:
+                product["image"] = img_tag.get("src", "")
+            
+            if product:
+                products.append(product)
+        
+        return products
+    
+    # Pattern 2: Generic product containers
+    product_selectors = [
+        ("div", "product-item"),
+        ("div", "product-card"),
+        ("div", "product"),
+        ("li", "product"),
+        ("div", "item"),
+    ]
+    
+    for tag, class_name in product_selectors:
+        items = soup.find_all(tag, class_=lambda x: x and class_name in str(x).lower())
+        if items:
+            for item in items:
+                product = {}
+                
+                # Try to find product name
+                name_tag = item.find(["h2", "h3", "h4", "a"])
+                if name_tag:
+                    product["name"] = name_tag.get_text(strip=True)[:200]
+                
+                # Try to find price (look for currency symbols or "price" class)
+                price_tag = item.find(class_=lambda x: x and "price" in str(x).lower())
+                if price_tag:
+                    product["price"] = price_tag.get_text(strip=True)
+                
+                # Try to find rating
+                rating_tag = item.find(class_=lambda x: x and "rating" in str(x).lower())
+                if rating_tag:
+                    product["rating"] = rating_tag.get_text(strip=True)
+                
+                if product.get("name"):
+                    products.append(product)
+            
+            if products:
+                return products
+    
+    return products
 
 
 def load_urls_from_file(filepath: str) -> list[str]:

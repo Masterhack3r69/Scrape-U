@@ -210,12 +210,23 @@ class Orchestrator:
             
             # Check if already stored
             if await self._storage.exists(url):
-                logger.info(f"Skipping cached: {url}")
+                logger.info(f"Loading from cache: {url}")
                 content = await self._storage.load(url)
+                
+                # Parse cached content if parser provided
+                data = {}
+                if self._parser and content:
+                    try:
+                        data = self._parser(url, content)
+                        data, _ = self._cleaner.clean_dict(data)
+                    except Exception as e:
+                        logger.error(f"Parser error for cached {url}: {e}")
+                
                 return ScrapeResult(
                     url=url,
                     success=True,
                     content=content or "",
+                    data=data,
                 )
             
             # Fetch content
